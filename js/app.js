@@ -2,7 +2,6 @@
 /* Uses Watchdog Rigged.glb with raccoon-style face tracking */
 
 import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import {
   FilesetResolver,
@@ -46,26 +45,15 @@ let video = null;
 let scene = null;
 let avatar = null;
 
-function getViewportSizeAtDepth(camera, depth) {
-  const viewportHeightAtDepth = 2 * depth * Math.tan(THREE.MathUtils.degToRad(0.5 * camera.fov));
-  const viewportWidthAtDepth = viewportHeightAtDepth * camera.aspect;
-  return new THREE.Vector2(viewportWidthAtDepth, viewportHeightAtDepth);
-}
-
-function createCameraPlaneMesh(camera, depth, material) {
-  const viewportSize = getViewportSizeAtDepth(camera, depth);
-  const geometry = new THREE.PlaneGeometry(viewportSize.width, viewportSize.height);
-  geometry.translate(0, 0, -depth);
-  return new THREE.Mesh(geometry, material);
-}
-
 class BasicScene {
   constructor() {
     this.height = window.innerHeight;
     this.width = (this.height * 1280) / 720;
     this.scene = new THREE.Scene();
+    this.scene.background = new THREE.Color(0x000000);
     this.camera = new THREE.PerspectiveCamera(60, this.width / this.height, 0.01, 5000);
-    this.renderer = new THREE.WebGLRenderer({ antialias: true });
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+    this.renderer.setClearColor(0x000000);
     this.renderer.setSize(this.width, this.height);
     if (this.renderer.outputColorSpace !== undefined) {
       this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -80,22 +68,10 @@ class BasicScene {
     directionalLight.position.set(0, 1, 0);
     this.scene.add(directionalLight);
 
-    this.camera.position.z = 0;
-    this.controls = new OrbitControls(this.camera, this.renderer.domElement);
-    const orbitTarget = this.camera.position.clone();
-    orbitTarget.z -= 5;
-    this.controls.target = orbitTarget;
-    this.controls.update();
+    this.camera.position.set(0, 0, 0);
+    this.camera.lookAt(0, 0, -3);
 
-    const vid = document.getElementById('video');
-    const inputFrameTexture = new THREE.VideoTexture(vid);
-    const inputFramesDepth = 500;
-    const inputFramesPlane = createCameraPlaneMesh(
-      this.camera,
-      inputFramesDepth,
-      new THREE.MeshBasicMaterial({ map: inputFrameTexture })
-    );
-    this.scene.add(inputFramesPlane);
+    // No OrbitControls - fixed view, no dragging/panning
 
     this.lastTime = 0;
     this.callbacks = [];
@@ -182,11 +158,17 @@ class Avatar {
   }
 
   applyMatrix(matrix, opts = {}) {
-    const { scale = 1 } = opts;
+    const { fixedScale = 4, fixedDepth = -2.5 } = opts;
     if (!this.gltf) return;
-    matrix.scale(new THREE.Vector3(scale, scale, scale));
+    const pos = new THREE.Vector3();
+    const quat = new THREE.Quaternion();
+    const scl = new THREE.Vector3();
+    matrix.decompose(pos, quat, scl);
     this.gltf.scene.matrixAutoUpdate = false;
-    this.gltf.scene.matrix.copy(matrix);
+    this.gltf.scene.position.set(0, 0, fixedDepth);
+    this.gltf.scene.quaternion.copy(quat);
+    this.gltf.scene.scale.setScalar(fixedScale);
+    this.gltf.scene.updateMatrix();
   }
 
   offsetRoot(offset, rotation) {
@@ -226,7 +208,7 @@ function detectFaceLandmarks(time) {
     const matrices = landmarks.facialTransformationMatrixes;
     if (matrices && matrices.length > 0) {
       const matrix = new THREE.Matrix4().fromArray(matrices[0].data);
-      avatar.applyMatrix(matrix, { scale: 40 });
+      avatar.applyMatrix(matrix, { fixedScale: 4, fixedDepth: -2.5 });
     }
     const blends = landmarks.faceBlendshapes;
     if (blends && blends.length > 0) {
@@ -283,6 +265,23 @@ async function initMediaPipe() {
   addLog('INFO', 'MediaPipe FaceLandmarker loaded');
 }
 
+const CALIBRATION_SECONDS = 3;
+
+async function runCalibration() {
+  const overlay = document.getElementById('calibration-overlay');
+  const textEl = document.getElementById('calibration-text');
+  const countdownEl = document.getElementById('calibration-countdown');
+  overlay.classList.remove('hidden');
+
+  for (let i = CALIBRATION_SECONDS; i >= 0; i--) {
+    textEl.textContent = i > 0 ? 'Position your face in the frame' : 'Calibrated!';
+    countdownEl.textContent = i > 0 ? String(i) : '';
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+
+  overlay.classList.add('hidden');
+}
+
 async function runDemo() {
   try {
     setStatus('Initializing...', 'loading');
@@ -293,17 +292,37 @@ async function runDemo() {
     await streamWebcam();
     await initMediaPipe();
 
+    setStatus('Calibrating - position your face', 'loading');
     video.requestVideoFrameCallback(onVideoFrame);
+    await runCalibration();
+
     addLog('INFO', 'Face tracking started');
     setStatus('Ready - Face the camera', 'success');
   } catch (e) {
     addLog('ERROR', `Demo failed: ${e.message}`);
     setStatus(`Failed: ${e.message}`, 'error');
+    document.getElementById('calibration-overlay')?.classList.add('hidden');
   }
 }
 
 // --- UI ---
-document.getElementById('gear-btn').addEventListener('click', () => {
+async function copyLogsToClipboard() {
+  const text = logs.length ? logs.join('\n') : 'No logs yet.';
+  try {
+    await navigator.clipboard.writeText(text);
+    const statusEl = document.getElementById('status-text');
+    const origStatus = statusEl?.textContent || '';
+    if (statusEl) {
+      statusEl.textContent = 'Logs copied!';
+      setTimeout(() => { statusEl.textContent = origStatus; }, 2000);
+    }
+  } catch (e) {
+    addLog('ERROR', `Copy failed: ${e.message}`);
+  }
+}
+
+document.getElementById('gear-btn').addEventListener('click', async () => {
+  await copyLogsToClipboard();
   const panel = document.getElementById('settings-panel');
   panel.classList.toggle('hidden');
 });
@@ -312,6 +331,20 @@ document.getElementById('logs-btn').addEventListener('click', () => {
   document.getElementById('settings-panel').classList.add('hidden');
   document.getElementById('logs-modal').classList.remove('hidden');
   document.getElementById('logs-output').textContent = logs.length ? logs.join('\n') : 'No logs yet.';
+});
+
+document.getElementById('copy-logs-btn').addEventListener('click', async () => {
+  const text = document.getElementById('logs-output').textContent;
+  if (!text) return;
+  try {
+    await navigator.clipboard.writeText(text);
+    const btn = document.getElementById('copy-logs-btn');
+    const orig = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = orig; }, 2000);
+  } catch (e) {
+    addLog('ERROR', `Copy failed: ${e.message}`);
+  }
 });
 
 document.getElementById('close-settings-btn').addEventListener('click', () => {

@@ -32,8 +32,18 @@
     <div class="logs-content">
       <h3>Error &amp; Debug Logs</h3>
       <pre id="logs-output"></pre>
+      <button id="copy-logs-btn" class="copy-btn">Copy Logs</button>
       <button id="close-logs-btn" class="close-btn">Close</button>
       <button id="clear-logs-btn" class="clear-btn">Clear Logs</button>
+    </div>
+  </div>
+
+  <!-- Calibration overlay -->
+  <div id="calibration-overlay" class="calibration-overlay hidden">
+    <div class="calibration-frame">
+      <div class="calibration-oval"></div>
+      <p id="calibration-text">Position your face in the frame</p>
+      <p id="calibration-countdown"></p>
     </div>
   </div>
 
