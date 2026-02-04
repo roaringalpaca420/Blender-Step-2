@@ -111,6 +111,7 @@ class Avatar {
   }
 
   loadModel(url) {
+    let lastLogPct = -1;
     this.loader.load(
       url,
       (gltf) => {
@@ -124,8 +125,12 @@ class Avatar {
         addLog('INFO', 'Avatar model loaded successfully');
       },
       (progress) => {
-        const pct = progress.total ? 100 * (progress.loaded / progress.total) : 0;
-        addLog('INFO', `Loading model... ${pct.toFixed(1)}%`);
+        if (!progress.total) return;
+        const pct = Math.floor(100 * (progress.loaded / progress.total));
+        if (pct - lastLogPct >= 25 || pct >= 100) {
+          lastLogPct = pct;
+          addLog('INFO', `Loading model... ${Math.min(pct, 100)}%`);
+        }
       },
       (err) => {
         addLog('ERROR', `Failed to load model: ${err.message || err}`);
@@ -135,6 +140,7 @@ class Avatar {
   }
 
   init(gltf) {
+    this.gltf.scene.visible = false;
     gltf.scene.traverse((obj) => {
       if (obj.isBone && !this.root) this.root = obj;
       if (!obj.isMesh) return;
@@ -144,6 +150,10 @@ class Avatar {
         this.morphTargetMeshes.push(mesh);
       }
     });
+  }
+
+  setVisible(visible) {
+    if (this.gltf?.scene) this.gltf.scene.visible = visible;
   }
 
   updateBlendshapes(blendshapes) {
@@ -201,18 +211,22 @@ function retarget(blendshapes) {
   return coefsMap;
 }
 
+let calibrationActive = true;
+
 function detectFaceLandmarks(time) {
   if (!faceLandmarker || !avatar) return;
   try {
     const landmarks = faceLandmarker.detectForVideo(video, time);
     const matrices = landmarks.facialTransformationMatrixes;
-    if (matrices && matrices.length > 0) {
+    const blends = landmarks.faceBlendshapes;
+    if (calibrationActive) return;
+    if (matrices && matrices.length > 0 && blends && blends.length > 0) {
+      avatar.setVisible(true);
       const matrix = new THREE.Matrix4().fromArray(matrices[0].data);
       avatar.applyMatrix(matrix, { fixedScale: 4, fixedDepth: -2.5 });
-    }
-    const blends = landmarks.faceBlendshapes;
-    if (blends && blends.length > 0) {
       avatar.updateBlendshapes(retarget(blends));
+    } else {
+      avatar.setVisible(false);
     }
   } catch (e) {
     addLog('ERROR', `Face detection error: ${e.message}`);
@@ -268,6 +282,7 @@ async function initMediaPipe() {
 const CALIBRATION_SECONDS = 3;
 
 async function runCalibration() {
+  document.body.classList.add('calibrating');
   const overlay = document.getElementById('calibration-overlay');
   const textEl = document.getElementById('calibration-text');
   const countdownEl = document.getElementById('calibration-countdown');
@@ -280,6 +295,8 @@ async function runCalibration() {
   }
 
   overlay.classList.add('hidden');
+  document.body.classList.remove('calibrating');
+  calibrationActive = false;
 }
 
 async function runDemo() {
@@ -302,6 +319,8 @@ async function runDemo() {
     addLog('ERROR', `Demo failed: ${e.message}`);
     setStatus(`Failed: ${e.message}`, 'error');
     document.getElementById('calibration-overlay')?.classList.add('hidden');
+    document.body.classList.remove('calibrating');
+    calibrationActive = false;
   }
 }
 

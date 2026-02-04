@@ -41,6 +41,21 @@ video {
   display: none;
 }
 
+body.calibrating video {
+  display: block !important;
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+  z-index: 1;
+}
+
+body.calibrating .container canvas {
+  visibility: hidden;
+}
+
 /* Status bar */
 #status-bar {
   position: fixed;
@@ -201,7 +216,7 @@ video {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.6);
+  background: transparent;
   pointer-events: none;
 }
 
@@ -220,8 +235,9 @@ video {
 .calibration-oval {
   width: 200px;
   height: 260px;
-  border: 3px solid rgba(255, 255, 255, 0.9);
+  border: 4px solid rgba(255, 255, 255, 0.95);
   border-radius: 50%;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.4);
 }
 
 #calibration-text,
