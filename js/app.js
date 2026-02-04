@@ -216,16 +216,20 @@ function retarget(blendshapes) {
 }
 
 let calibrationActive = true;
+let lastFaceDetected = false;
 
 function detectFaceLandmarks(time) {
-  if (!faceLandmarker || !avatar || !video) return;
+  if (!faceLandmarker || !video) return;
   if (video.readyState < 2) return;
-  if (calibrationActive) return;
   try {
     const landmarks = faceLandmarker.detectForVideo(video, time);
     const matrices = landmarks.facialTransformationMatrixes || landmarks.facialTransformationMatrices;
     const blends = landmarks.faceBlendshapes;
-    if (matrices && matrices.length > 0 && blends && blends.length > 0) {
+    const hasFace = matrices && matrices.length > 0 && blends && blends.length > 0;
+    lastFaceDetected = hasFace;
+    if (calibrationActive) return;
+    if (!avatar) return;
+    if (hasFace) {
       avatar.setVisible(true);
       const matrix = new THREE.Matrix4().fromArray(matrices[0].data);
       avatar.applyMatrix(matrix, { fixedScale: 4, fixedDepth: -2.5 });
@@ -234,6 +238,7 @@ function detectFaceLandmarks(time) {
       avatar.setVisible(false);
     }
   } catch (e) {
+    lastFaceDetected = false;
     addLog('ERROR', `Face detection: ${e.message}`);
   }
 }
@@ -286,7 +291,8 @@ async function initMediaPipe() {
   addLog('INFO', 'MediaPipe FaceLandmarker loaded');
 }
 
-const CALIBRATION_SECONDS = 3;
+const CALIBRATION_COUNTDOWN = 2;
+const CALIBRATION_WAIT_MS = 15000;
 
 async function runCalibration() {
   document.body.classList.add('calibrating');
@@ -295,10 +301,29 @@ async function runCalibration() {
   const countdownEl = document.getElementById('calibration-countdown');
   overlay.classList.remove('hidden');
 
-  for (let i = CALIBRATION_SECONDS; i >= 0; i--) {
-    textEl.textContent = i > 0 ? 'Position your face in the frame' : 'Calibrated!';
-    countdownEl.textContent = i > 0 ? String(i) : '';
-    await new Promise((r) => setTimeout(r, 1000));
+  textEl.textContent = 'Position your face in the frame';
+  countdownEl.textContent = '';
+  let waitStart = Date.now();
+  while (!lastFaceDetected && (Date.now() - waitStart) < CALIBRATION_WAIT_MS) {
+    await new Promise((r) => setTimeout(r, 200));
+    const elapsed = Math.floor((Date.now() - waitStart) / 1000);
+    if (!lastFaceDetected && elapsed > 2) {
+      textEl.textContent = 'Face not detected — move into frame, improve lighting';
+      countdownEl.textContent = '';
+    }
+  }
+
+  if (!lastFaceDetected) {
+    textEl.textContent = 'Calibration failed — face not detected';
+    countdownEl.textContent = 'Starting anyway…';
+    await new Promise((r) => setTimeout(r, 2000));
+  } else {
+    addLog('INFO', 'Face detected, calibrating…');
+    for (let i = CALIBRATION_COUNTDOWN; i >= 0; i--) {
+      textEl.textContent = i > 0 ? 'Hold still…' : 'Calibrated!';
+      countdownEl.textContent = i > 0 ? String(i) : '';
+      await new Promise((r) => setTimeout(r, 1000));
+    }
   }
 
   overlay.classList.add('hidden');
