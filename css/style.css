@@ -1,0 +1,236 @@
+/* Face Tracking Avatar - Mobile-friendly styles */
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.container {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+canvas {
+  position: absolute;
+  transform: scaleX(-1);
+  z-index: 0;
+  top: 0;
+  left: 0;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover;
+}
+
+video {
+  display: none;
+}
+
+/* Status bar */
+#status-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: 12px 16px;
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  z-index: 100;
+  text-align: center;
+}
+
+#status-bar.loading { color: #ffc107; }
+#status-bar.success { color: #4caf50; }
+#status-bar.error { color: #f44336; }
+
+/* Gear button */
+.gear-btn {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  width: 44px;
+  height: 44px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.15);
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  cursor: pointer;
+  z-index: 101;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.gear-btn:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.gear-btn:active {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Settings panel */
+.settings-panel {
+  position: fixed;
+  top: 56px;
+  right: 12px;
+  background: rgba(30, 30, 30, 0.95);
+  border-radius: 12px;
+  padding: 16px;
+  z-index: 102;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  min-width: 180px;
+}
+
+.settings-panel.hidden {
+  display: none !important;
+}
+
+.settings-panel button {
+  display: block;
+  width: 100%;
+  padding: 12px 16px;
+  margin-bottom: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.settings-panel button:last-child {
+  margin-bottom: 0;
+}
+
+.settings-panel button:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Logs modal */
+.logs-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.logs-modal.hidden {
+  display: none !important;
+}
+
+.logs-content {
+  background: #1e1e1e;
+  border-radius: 12px;
+  padding: 20px;
+  max-width: 100%;
+  max-height: 80vh;
+  width: 400px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.logs-content h3 {
+  margin: 0 0 12px 0;
+  color: #fff;
+  font-size: 18px;
+}
+
+#logs-output {
+  flex: 1;
+  min-height: 200px;
+  max-height: 400px;
+  overflow: auto;
+  background: #111;
+  color: #a5d6a7;
+  padding: 12px;
+  border-radius: 8px;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin-bottom: 12px;
+}
+
+.close-btn {
+  background: #555 !important;
+}
+
+.clear-btn {
+  background: #d32f2f !important;
+  margin-top: 8px !important;
+}
+
+/* Mobile responsive */
+@media screen and (max-width: 500px) {
+  #status-bar {
+    font-size: 12px;
+    padding: 10px 12px;
+  }
+
+  .gear-btn {
+    top: 10px;
+    right: 10px;
+    width: 40px;
+    height: 40px;
+  }
+
+  .settings-panel {
+    top: 52px;
+    right: 10px;
+    min-width: 160px;
+  }
+
+  .logs-content {
+    width: 100%;
+    max-height: 70vh;
+  }
+
+  #logs-output {
+    max-height: 300px;
+    font-size: 11px;
+  }
+}
+
+@media screen and (max-height: 500px) {
+  #status-bar {
+    padding: 8px 12px;
+  }
+
+  .gear-btn {
+    width: 36px;
+    height: 36px;
+    top: 8px;
+    right: 8px;
+  }
+
+  .gear-btn svg {
+    width: 22px;
+    height: 22px;
+  }
+}
