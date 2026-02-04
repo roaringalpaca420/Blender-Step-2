@@ -21,7 +21,11 @@ function logEntry(level, ...args) {
   else if (level === 'WARN') originalConsoleWarn.apply(console, args);
 }
 
-console.error = (...args) => logEntry('ERROR', ...args);
+console.error = (...args) => {
+  const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
+  if (msg.includes('INFO:') || msg.includes('XNNPACK')) return;
+  logEntry('ERROR', ...args);
+};
 console.warn = (...args) => logEntry('WARN', ...args);
 
 function addLog(level, msg) {
@@ -214,12 +218,13 @@ function retarget(blendshapes) {
 let calibrationActive = true;
 
 function detectFaceLandmarks(time) {
-  if (!faceLandmarker || !avatar) return;
+  if (!faceLandmarker || !avatar || !video) return;
+  if (video.readyState < 2) return;
+  if (calibrationActive) return;
   try {
     const landmarks = faceLandmarker.detectForVideo(video, time);
-    const matrices = landmarks.facialTransformationMatrixes;
+    const matrices = landmarks.facialTransformationMatrixes || landmarks.facialTransformationMatrices;
     const blends = landmarks.faceBlendshapes;
-    if (calibrationActive) return;
     if (matrices && matrices.length > 0 && blends && blends.length > 0) {
       avatar.setVisible(true);
       const matrix = new THREE.Matrix4().fromArray(matrices[0].data);
@@ -229,13 +234,15 @@ function detectFaceLandmarks(time) {
       avatar.setVisible(false);
     }
   } catch (e) {
-    addLog('ERROR', `Face detection error: ${e.message}`);
+    addLog('ERROR', `Face detection: ${e.message}`);
   }
 }
 
 function onVideoFrame(time) {
-  detectFaceLandmarks(time);
-  video.requestVideoFrameCallback(onVideoFrame);
+  if (video) {
+    detectFaceLandmarks(time);
+    video.requestVideoFrameCallback(onVideoFrame);
+  }
 }
 
 async function streamWebcam() {
@@ -271,7 +278,7 @@ async function initMediaPipe() {
     'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task'
   );
   await faceLandmarker.setOptions({
-    baseOptions: { delegate: 'GPU' },
+    baseOptions: { delegate: 'CPU' },
     runningMode: 'VIDEO',
     outputFaceBlendshapes: true,
     outputFacialTransformationMatrixes: true
